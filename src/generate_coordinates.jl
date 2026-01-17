@@ -2,19 +2,21 @@ function generate_coordinates(; mask)
     
     mask = isone.(niread(mask))
 
-    x = Int64[]
-    y = Int64[]
-    z = Int64[]
+    x = Int[]
+    y = Int[]
+    z = Int[]
+    voxel = Int[]
 
-    for ind in CartesianIndices(mask)
+    for (i, ind) in enumerate(CartesianIndices(mask))
         if mask[ind]
             push!(x, ind[1])
             push!(y, ind[2])
             push!(z, ind[3])
+            push!(voxel, i)
         end
     end
 
-    coordinates = DataFrame(:x => x, :y => y, :z => z)
+    coordinates = DataFrame(:voxel => voxel, :x => x, :y => y, :z => z)
 
     return coordinates
 end
