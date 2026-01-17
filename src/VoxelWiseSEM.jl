@@ -6,6 +6,7 @@ module VoxelWiseSEM
         include("apply_voxelwise.jl")
         include("preproc.jl")
         include("helper.jl")
+        include("logs.jl")
     export 
         generate_measurements,
         generate_coordinates,
@@ -28,10 +29,5 @@ module VoxelWiseSEM
         condition_filename,
         save_log,
         # logs
-        log_n_voxel!,
-        log_allmissing!,
-        log_zeros!,
-        log_mad_zero!,
-        log_removed_data!,
-        log_removed_voxels!
+        PreProcLog
 end
