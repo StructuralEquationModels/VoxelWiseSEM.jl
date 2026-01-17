@@ -24,3 +24,15 @@ function Base.push!(log::PreProcLog, k, v)
     push!(log.logs, Dict(k => v))
     return nothing
 end
+
+function Base.getindex(log::PreProcLog, s)
+    return log.logs[s]
+end
+
+function save_log(log::PreProcLog, r)
+    jldsave("logs/"*condition_filename(r)*".jld2", log = log)
+end
+
+function load_log(r)
+    load("logs/"*condition_filename(r)*".jld2")["log"]
+end

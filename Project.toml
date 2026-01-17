@@ -1,7 +1,7 @@
 name = "VoxelWiseSEM"
 uuid = "70f72f5e-8f64-4fed-8e5a-3e142e038e52"
-authors = ["Maximilian Ernst <maximilian.stefan.ernst@gmail.com>"]
 version = "0.1.0"
+authors = ["Maximilian Ernst <maximilian.stefan.ernst@gmail.com>"]
 
 [deps]
 Arrow = "69666777-d1a9-59fb-9406-91d4454c9d45"

@@ -27,7 +27,8 @@ module VoxelWiseSEM
         # cluster
         slurm_array_id,
         condition_filename,
-        save_log,
         # logs
-        PreProcLog
+        PreProcLog,
+        save_log,
+        load_log
 end
