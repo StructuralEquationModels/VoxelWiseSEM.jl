@@ -4,9 +4,9 @@ module VoxelWiseSEM
         include("generate_coordinates.jl")
         include("voxel_wise_data.jl")
         include("apply_voxelwise.jl")
+        include("logs.jl")
         include("preproc.jl")
         include("helper.jl")
-        include("logs.jl")
     export 
         generate_measurements,
         generate_coordinates,
