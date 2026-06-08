@@ -1,5 +1,5 @@
 """
-    generate_measurements(; dir, modality = "anat") -> DataFrame
+    generate_measurements(;dir, modality = "anat") -> DataFrame
  
 Scans a BIDS dataset and returns a DataFrame with one row per NIfTI file found.
 Only '.nii' and '.nii.gz' files are included.
@@ -16,7 +16,6 @@ A DataFrame with columns:
 - 'session_number': integer parsed from the trailing digits of the session label
 - 'modality': the datatype folder name, e.g. '"anat"'
 - 'file': filename of the NIfTI file
- 
 """
 function generate_measurements(;dir, modality = "anat")
     # find subjects
