@@ -1,6 +1,6 @@
 ## Tutorial
 
-This tutorial walks through a complete voxel-wise SEM analysis. 
+This tutorial walks through a complete voxel-wise SEM analysis.  
 Dataset: Midnight Scan Club (MSC). 
 OpenNeuro: ```https://openneuro.org/datasets/ds000224/versions/1.0.4```
 
@@ -161,8 +161,8 @@ save_voxel_wise_data(vw_data, "data/vw_data.jld2")
 ```
 
 Indexing examples:  
-    vw_data[coordinates.voxel[1], :, :]  — one voxel, all subjects × sessions (2×2 matrix). 
-    vw_data[:, 1, 1]                     — all voxels, subject 1, session 1  
+- vw_data[coordinates.voxel[1], :, :]  — one voxel, all subjects × sessions (2×2 matrix). 
+- vw_data[:, 1, 1]                     — all voxels, subject 1, session 1  
 
 ## Step 3 — Preprocessing
 
