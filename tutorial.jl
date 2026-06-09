@@ -66,7 +66,7 @@ using StructuralEquationModels
 #  Paths
 
 dataset_dir = "data/ds000224"
-mask_path   = "data/brain_mask.nii.gz"
+mask_path   = "data/brain_mask.nii.gz" # we will create this mask further down
 mkpath("data/measurements")
 mkpath("data/results")
 
@@ -130,7 +130,7 @@ ref_path = joinpath(
 img = niread(ref_path)
 
 # Set the entire volume to 0, then turn on a 5×5×5 block in the centre.
-img.raw .= 0.0f0
+img.raw .= 0
 x_mid, y_mid, z_mid = size(img) .÷ 2
 img.raw[x_mid-2:x_mid+2, y_mid-2:y_mid+2, z_mid-2:z_mid+2] .= 1.0f0
 
@@ -145,10 +145,6 @@ println("mask written to: ", mask_path, "  (", sum(img.raw .== 1), " voxels)")
 # in-mask voxel. 
 
 coordinates = generate_coordinates(mask = mask_path)
-
-println("voxels in mask: ", nrow(coordinates))
-# → 125  (5×5×5)
-
 ############################################################################################
 # STEP 2c — Reshape BIDS volumes into a voxel-wise 3D array
 ############################################################################################
@@ -273,16 +269,14 @@ model = Sem(
 function fit_to_voxel(voxel_matrix; model, specification)
     # transpose to (n_sessions × n_subjects) as expected by the SEM
     model_vox = replace_observed(
-        model;
-        data          = voxel_matrix',
-        specification = specification
+        model, voxel_matrix'
     )
     fitted = fit(model_vox; start_val = start_simple)
 
     # collect parameter names and estimates into a NamedTuple
     # apply_voxelwise concatenates these into columns of the results DataFrame
     out = param_labels(fitted) .=> solution(fitted)
-    push!(out, :converged => convergence(fitted))
+    push!(out, :converged => converged(fitted))
     return NamedTuple(out)
 end
 
