@@ -15,14 +15,13 @@ A DataFrame with columns:
 - 'session': BIDS session label, e.g. '"ses-struct01"'
 - 'session_number': integer parsed from the trailing digits of the session label
 - 'modality': the datatype folder name, e.g. '"anat"'
-- 'file': filename of the NIfTI file
+- 'file': relative path of the NIfTI file from the BIDS root directory
 """
 function generate_measurements(;dir, modality = "anat")
     # find subjects
     subjects = readdir(dir)
     subjects = sort(filter(x -> startswith(x, "sub-"), subjects))  # the trailing dash avoids false matches
     # sort() is added so subject_number is always assigned in alphabetical order,
-    # making the numbering deterministic regardless of filesystem order.
 
     # find sessions
     sessions = [find_sessions(dir, sub, modality) for sub in subjects]
@@ -40,8 +39,7 @@ function generate_measurements(;dir, modality = "anat")
         for (j, ses) in enumerate(sessions[i])
             for (k, file) in enumerate(files[i][j])
                 session_number = _parse_session_number(ses)
-                # That hard-coded slice breaks for session labels like "ses-func01" or "ses-baseline"
-                # _parse_session_number extracts the trailing digits robustly.
+                # _parse_session_number extracts the trailing digits
                 push!(
                     rows, 
                     (
@@ -50,7 +48,7 @@ function generate_measurements(;dir, modality = "anat")
                         session = ses, 
                         session_number = session_number,
                         modality= modality,
-                        file = file
+                        file = joinpath(sub, ses, modality, file)
                     )
                 )
             end

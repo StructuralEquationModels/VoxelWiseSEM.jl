@@ -24,13 +24,13 @@ save_measurements(measurements, "data/measurements/measurements.csv")
 
 # 2. Create a small dummy mask to select a small region in the center of the brain volume.
 println("\nCreating a small binary test mask...")
-ref_vol_path = joinpath(dataset_dir, measurements[1, :subject], measurements[1, :session], "anat", measurements[1, :file])
+ref_vol_path = joinpath(dataset_dir, measurements[1, :file])
 img = niread(ref_vol_path)
 
 # Mutate the raw array to be a binary mask (setting a 5x5x5 region in the center to 1, others to 0)
-img.raw .= 0.0f0
+img.raw .= 0
 x_mid, y_mid, z_mid = size(img) .÷ 2
-img.raw[x_mid-2:x_mid+2, y_mid-2:y_mid+2, z_mid-2:z_mid+2] .= 1.0f0
+img.raw[x_mid-5:x_mid+5, y_mid-5:y_mid+5, z_mid-5:z_mid+5] .= 1.0
 
 niwrite(mask_path, img)
 println("Test mask written to: ", mask_path)
@@ -52,6 +52,8 @@ println("\nStep 3: Preprocessing...")
 log = PreProcLog()
 coordinates = step_missings!(coordinates, log, vw_data)
 coordinates = step_zeros!(coordinates, log, vw_data)
+coordinates = step_mad!(coordinates, log, vw_data; mad_cutoff = 2.5)
+coordinates = step_rm_voxel!(coordinates, log, vw_data; voxel_cutoff = 0.2)
 println("Preprocessed coordinates count: ", nrow(coordinates))
 
 # 6. Fit SEM model using the actual packages and workflow
@@ -82,8 +84,8 @@ partable = ParameterTable(
 )
 
 # Initialize base model using data from the first voxel
-# data is transposed so rows are observations (sessions) and columns are variables (subjects)
-base_data = vw_data[coordinates.voxel[1], :, :]'
+# data shape: rows = observations (sessions) and columns = variables (subjects)
+base_data = vw_data[coordinates.voxel_idx[1], :, :]
 model = Sem(
     specification = partable,
     observed = SemObservedMissing,
@@ -95,10 +97,10 @@ model = Sem(
 
 # Fitting function for each voxel
 function fit_to_voxel(voxel_matrix; model, specification)
-    # voxel_matrix size is (n_subjects, n_sessions). Transpose to (n_sessions, n_subjects) for the model.
+    # voxel_matrix is already in (n_sessions, n_subjects) shape.
     model_vox = replace_observed(
         model;
-        data = voxel_matrix',
+        data = voxel_matrix,
         specification = specification
     )
     fitted = fit(model_vox; start_val = start_simple)
@@ -122,4 +124,4 @@ println(first(results, 5))
 # Clean up test mask
 rm(mask_path, force=true)
 
-println("\n=== Validation Successful! VoxelWiseSEM runs perfectly on ds000224 ===")
+println("\n=== Validation Successful! VoxelWiseSEM runs perfectly ===")

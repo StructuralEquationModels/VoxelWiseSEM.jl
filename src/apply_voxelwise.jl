@@ -9,8 +9,9 @@ function apply_voxelwise(fun, coordinates::DataFrame, data::Dict; kwargs...)
 end
 
 function apply_voxelwise(fun, coordinates::DataFrame, data::Array; kwargs...)
+    indices = hasproperty(coordinates, :voxel_idx) ? coordinates.voxel_idx : coordinates.voxel
     rows = @showprogress [
-        fun(view(data, i, :, :); kwargs...) for i in coordinates.voxel
+        fun(view(data, i, :, :); kwargs...) for i in indices
         ]
     return [coordinates DataFrame(rows)]
 end
