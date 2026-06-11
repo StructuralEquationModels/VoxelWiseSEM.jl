@@ -1,5 +1,5 @@
 """
-    generate_measurements(; dir, modality = "anat") -> DataFrame
+    generate_measurements(;dir, modality = "anat") -> DataFrame
  
 Scans a BIDS dataset and returns a DataFrame with one row per NIfTI file found.
 Only '.nii' and '.nii.gz' files are included.
@@ -15,34 +15,25 @@ A DataFrame with columns:
 - 'session': BIDS session label, e.g. '"ses-struct01"'
 - 'session_number': integer parsed from the trailing digits of the session label
 - 'modality': the datatype folder name, e.g. '"anat"'
-- 'file': filename of the NIfTI file
- 
+- 'file': relative path of the NIfTI file from the BIDS root directory
 """
 function generate_measurements(;dir, modality = "anat")
     # find subjects
     subjects = readdir(dir)
-    subjects = sort(filter(x -> startswith(x, "sub-"), subjects))  # the trailing dash avoids false matches
-    # sort() is added so subject_number is always assigned in alphabetical order,
-    # making the numbering deterministic regardless of filesystem order.
+    subjects = sort(filter(x -> startswith(x, "sub-"), subjects))
 
     # find sessions
     sessions = [find_sessions(dir, sub, modality) for sub in subjects]
-    # modality is now forwarded to find_sessions so the function works
-    # for any BIDS datatype folder ("anat", "func", "dwi", …), not just "anat"
 
     # find files
     files = [[filter(x -> endswith(x, ".nii") || endswith(x, ".nii.gz"), readdir(joinpath(dir, sub, ses, modality))) 
     for ses in sessions[i]] for (i, sub) in enumerate(subjects)]
-    # put everything together in a DataFrame
-
 
     rows = []
     for (i, sub) in enumerate(subjects)
         for (j, ses) in enumerate(sessions[i])
             for (k, file) in enumerate(files[i][j])
                 session_number = _parse_session_number(ses)
-                # That hard-coded slice breaks for session labels like "ses-func01" or "ses-baseline"
-                # _parse_session_number extracts the trailing digits robustly.
                 push!(
                     rows, 
                     (
@@ -51,7 +42,7 @@ function generate_measurements(;dir, modality = "anat")
                         session = ses, 
                         session_number = session_number,
                         modality= modality,
-                        file = file
+                        file = joinpath(sub, ses, modality, file)
                     )
                 )
             end
@@ -59,9 +50,7 @@ function generate_measurements(;dir, modality = "anat")
     end
     rows = DataFrame(rows)
     println("number of subjects:", unique(rows.subject_number))
-    println("number of sessions:", unique(rows.session_number)) 
-    # maximum() would crash on an empty DataFrame; unique() is safe and
-    # also more accurate (counts distinct session labels, not the highest index)
+    println("number of sessions:", unique(rows.session_number))
     return rows
 end
 

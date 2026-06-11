@@ -62,13 +62,17 @@ using Statistics
 using StenoGraphs
 using StructuralEquationModels
 
+# Fallback names method for NamedTuple to support save_log in the tutorial environment
+Base.names(nt::NamedTuple) = collect(keys(nt))
+
 ###########################################################################################
-#  Paths
+#  Setup Paths
 
 dataset_dir = "data/ds000224"
-mask_path   = "data/brain_mask.nii.gz"
+mask_path   = "data/brain_mask.nii.gz" # we will create this mask further down
 mkpath("data/measurements")
 mkpath("data/results")
+mkpath("logs")
 
 ###########################################################################################
 # STEP 1 — Check available measurements and create measurements.csv
@@ -88,6 +92,7 @@ mkpath("data/results")
 #   modality       "anat" 
 #   file           e.g. "sub-MSC01_ses-struct01_T1w.nii.gz"
 
+println("Step 1: Running generate_measurements...")
 measurements = generate_measurements(dir = dataset_dir, modality = "anat")
 
 # The anat/ folder contains both T1w and T2w images.
@@ -117,22 +122,16 @@ save_measurements(measurements, "data/measurements/measurements.csv")
 # which voxels to include in the analysis.
 
 # For this tutorial we create a small
-# 5×5×5 voxel mask in the centre of the volume so the pipeline runs quickly on any machine.
+# 11×11×11 voxel mask in the centre of the volume so the pipeline runs quickly on any machine.
 
 # Load the first T1w image to get the volume dimensions and NIfTI header.
-ref_path = joinpath(
-    dataset_dir,
-    measurements[1, :subject],
-    measurements[1, :session],
-    "anat",
-    measurements[1, :file]
-)
+ref_path = joinpath(dataset_dir, measurements[1, :file])
 img = niread(ref_path)
 
-# Set the entire volume to 0, then turn on a 5×5×5 block in the centre.
-img.raw .= 0.0f0
+# Set the entire volume to 0, then turn on an 11×11×11 block in the centre.
+img.raw .= 0
 x_mid, y_mid, z_mid = size(img) .÷ 2
-img.raw[x_mid-2:x_mid+2, y_mid-2:y_mid+2, z_mid-2:z_mid+2] .= 1.0f0
+img.raw[x_mid-5:x_mid+5, y_mid-5:y_mid+5, z_mid-5:z_mid+5] .= 1.0
 
 niwrite(mask_path, img)
 println("mask written to: ", mask_path, "  (", sum(img.raw .== 1), " voxels)")
@@ -144,11 +143,8 @@ println("mask written to: ", mask_path, "  (", sum(img.raw .== 1), " voxels)")
 # generate_coordinates reads the mask and returns a DataFrame with one row per
 # in-mask voxel. 
 
+println("\nStep 2b: Generating coordinates from mask...")
 coordinates = generate_coordinates(mask = mask_path)
-
-println("voxels in mask: ", nrow(coordinates))
-# → 125  (5×5×5)
-
 ############################################################################################
 # STEP 2c — Reshape BIDS volumes into a voxel-wise 3D array
 ############################################################################################
@@ -156,24 +152,24 @@ println("voxels in mask: ", nrow(coordinates))
 # voxel_wise_data loads every NIfTI file listed in measurements and assembles
 # a single 3D array of shape:
 #
-#   (n_voxels  ×  n_subjects  ×  n_sessions)
+#   (n_voxels  ×  n_sessions  ×  n_subjects)
 #    axis 1       axis 2         axis 3
 #
-# Axis 1 is addressed by coordinates.voxel (linear index in the full volume).
-# Axis 2 is addressed by measurements.subject_number  (1, 2, …).
-# Axis 3 is addressed by measurements.session_number  (1, 2, …).
+# Axis 1 is addressed by coordinates.voxel_idx.
+# Axis 2 is addressed by measurements.session_number  (1, 2, …).
+# Axis 3 is addressed by measurements.subject_number  (1, 2, …).
 #
-# For this tutorial the array shape will be (max_voxel_index, 2, 2)
+# For this tutorial the array shape will be (n_voxels, 2, 2)
 # where 2 subjects and 2 sessions each contribute one T1w scan.
 
 vw_data = voxel_wise_data(dataset_dir, measurements, coordinates)
 
 println("data array size: ", size(vw_data))
-# → (max_voxel_index, 2, 2)
+# → (n_voxels, 2, 2)
 
 # Indexing examples:
-#   vw_data[coordinates.voxel[1], :, :]  — one voxel, all subjects × sessions (2×2 matrix)
-#   vw_data[:, 1, 1]                     — all voxels, subject 1, session 1
+#   vw_data[coordinates.voxel_idx[1], :, :]  — one voxel, all sessions × subjects (2×2 matrix)
+#   vw_data[:, 1, 1]                         — all voxels, session 1, subject 1
 
 # Save to JLD2
 save_voxel_wise_data(vw_data, "data/vw_data.jld2")
@@ -182,6 +178,7 @@ save_voxel_wise_data(vw_data, "data/vw_data.jld2")
 # STEP 3 — Preprocessing and logging
 ############################################################################################
 
+println("\nStep 3: Preprocessing...")
 # PreProcLog records 
 log = PreProcLog()
 
@@ -201,7 +198,21 @@ coordinates = step_missings!(coordinates, log, vw_data)
 
 coordinates = step_zeros!(coordinates, log, vw_data)
 
+# ── 3c. Outlier removal using MAD (Median Absolute Deviation) ─────────────────
+
+# Sets values more than mad_cutoff * MAD away from the median to missing.
+# Voxels with a MAD of 0 are removed.
+
+coordinates = step_mad!(coordinates, log, vw_data; mad_cutoff = 2.5)
+
+# ── 3d. Remove voxels with too many outliers ──────────────────────────────────
+
+# Removes voxels where more than voxel_cutoff (fraction) of data points were removed as outliers.
+
+coordinates = step_rm_voxel!(coordinates, log, vw_data; voxel_cutoff = 0.2)
+
 println("voxels remaining after preprocessing: ", nrow(coordinates))
+
 
 # Inspect the log to see what was removed at each step.
 println(log)
@@ -212,6 +223,12 @@ println(log)
 #   Step 2:
 #       step_zeros!
 #       Dict("all_zero" => 0, "some_zero" => 0)
+#   Step 3: 
+#       step_mad!
+#       Dict("mad_cutoff" => 2.5, "mad_zero" => 0, "removed_data_fraction" => 0.086)
+#   Step 4: 
+#       step_rm_voxel!
+#       Dict("voxel_cutoff" => 0.2, "removed_voxel_fraction" => 0.345)
 
 # Save the log. condition_filename turns the named tuple into a filename string,
 # e.g. (modality="T1w",) → "modality_T1w.jld2"
@@ -233,15 +250,15 @@ latent_vars   = [:I]
 # ── 4a. Define the SEM graph with StenoGraphs ────────────────────────────────
 
 graph = @StenoGraph begin
-    I → fixed(1) .* _(observed_vars)
+    I → [fixed(1)] .* _(observed_vars)
 
     # variances
     I ↔ label(:var_I) * I                          # latent variance
-    _(observed_vars) ↔ label(:error) .* _(observed_vars)  # residual variance
+    _(observed_vars) ↔ [label(:error)] .* _(observed_vars)  # residual variance
 
     # mean structure
     Symbol("1") → label(:mean_I) * I               # latent mean
-    Symbol("1") → fixed(0) .* _(observed_vars)     # observed intercepts fixed to 0
+    Symbol("1") → [fixed(0)] .* _(observed_vars)     # observed intercepts fixed to 0
 end
 
 partable = ParameterTable(
@@ -251,11 +268,11 @@ partable = ParameterTable(
 )
 
 # ── 4b. Build the base model on the first voxel ──────────────────────────────
-# vw_data[v, :, :] is (n_subjects × n_sessions).
+# vw_data[v, :, :] is (n_sessions × n_subjects).
 # The SEM expects rows = observations (sessions) and columns = variables (subjects),
-# so we transpose with '.
+# which matches this layout directly.
 
-base_data = vw_data[coordinates.voxel[1], :, :]'   # shape: (n_sessions × n_subjects)
+base_data = vw_data[coordinates.voxel_idx[1], :, :]   # shape: (n_sessions × n_subjects)
 
 model = Sem(
     specification = partable,
@@ -268,14 +285,13 @@ model = Sem(
 
 # ── 4c. Define the per-voxel fitting function ─────────────────────────────────
 # apply_voxelwise calls this function once per voxel, passing a view of the
-# data array of shape (n_subjects × n_sessions).
+# data array of shape (n_sessions × n_subjects).
 
 function fit_to_voxel(voxel_matrix; model, specification)
-    # transpose to (n_sessions × n_subjects) as expected by the SEM
+    # The matrix is in the expected shape (n_sessions × n_subjects)
     model_vox = replace_observed(
-        model;
-        data          = voxel_matrix',
-        specification = specification
+        model; 
+        data = voxel_matrix, specification
     )
     fitted = fit(model_vox; start_val = start_simple)
 
@@ -288,7 +304,7 @@ end
 
 # ── 4d. Run apply_voxelwise ───────────────────────────────────────────────────
 # apply_voxelwise iterates over every row of coordinates, extracts the
-# (n_subjects × n_sessions) data slice for that voxel using coordinates.voxel
+# (n_sessions × n_subjects) data slice for that voxel using coordinates.voxel_idx
 # as the axis-1 index, calls fit_to_voxel, and concatenates the returned
 # NamedTuples into a DataFrame alongside the coordinates.
 
