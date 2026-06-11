@@ -65,11 +65,8 @@ using StructuralEquationModels
 # Fallback names method for NamedTuple to support save_log in the tutorial environment
 Base.names(nt::NamedTuple) = collect(keys(nt))
 
-# Alias to map converged(fitted) to the package's convergence(fitted)
-converged(fitted) = convergence(fitted)
-
 ###########################################################################################
-#  Paths
+#  Setup Paths
 
 dataset_dir = "data/ds000224"
 mask_path   = "data/brain_mask.nii.gz" # we will create this mask further down
@@ -95,6 +92,7 @@ mkpath("logs")
 #   modality       "anat" 
 #   file           e.g. "sub-MSC01_ses-struct01_T1w.nii.gz"
 
+println("Step 1: Running generate_measurements...")
 measurements = generate_measurements(dir = dataset_dir, modality = "anat")
 
 # The anat/ folder contains both T1w and T2w images.
@@ -145,6 +143,7 @@ println("mask written to: ", mask_path, "  (", sum(img.raw .== 1), " voxels)")
 # generate_coordinates reads the mask and returns a DataFrame with one row per
 # in-mask voxel. 
 
+println("\nStep 2b: Generating coordinates from mask...")
 coordinates = generate_coordinates(mask = mask_path)
 ############################################################################################
 # STEP 2c — Reshape BIDS volumes into a voxel-wise 3D array
@@ -179,6 +178,7 @@ save_voxel_wise_data(vw_data, "data/vw_data.jld2")
 # STEP 3 — Preprocessing and logging
 ############################################################################################
 
+println("\nStep 3: Preprocessing...")
 # PreProcLog records 
 log = PreProcLog()
 

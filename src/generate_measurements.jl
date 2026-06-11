@@ -20,26 +20,20 @@ A DataFrame with columns:
 function generate_measurements(;dir, modality = "anat")
     # find subjects
     subjects = readdir(dir)
-    subjects = sort(filter(x -> startswith(x, "sub-"), subjects))  # the trailing dash avoids false matches
-    # sort() is added so subject_number is always assigned in alphabetical order,
+    subjects = sort(filter(x -> startswith(x, "sub-"), subjects))
 
     # find sessions
     sessions = [find_sessions(dir, sub, modality) for sub in subjects]
-    # modality is now forwarded to find_sessions so the function works
-    # for any BIDS datatype folder ("anat", "func", "dwi", …), not just "anat"
 
     # find files
     files = [[filter(x -> endswith(x, ".nii") || endswith(x, ".nii.gz"), readdir(joinpath(dir, sub, ses, modality))) 
     for ses in sessions[i]] for (i, sub) in enumerate(subjects)]
-    # put everything together in a DataFrame
-
 
     rows = []
     for (i, sub) in enumerate(subjects)
         for (j, ses) in enumerate(sessions[i])
             for (k, file) in enumerate(files[i][j])
                 session_number = _parse_session_number(ses)
-                # _parse_session_number extracts the trailing digits
                 push!(
                     rows, 
                     (
@@ -56,9 +50,7 @@ function generate_measurements(;dir, modality = "anat")
     end
     rows = DataFrame(rows)
     println("number of subjects:", unique(rows.subject_number))
-    println("number of sessions:", unique(rows.session_number)) 
-    # maximum() would crash on an empty DataFrame; unique() is safe and
-    # also more accurate (counts distinct session labels, not the highest index)
+    println("number of sessions:", unique(rows.session_number))
     return rows
 end
 

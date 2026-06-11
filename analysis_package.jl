@@ -27,7 +27,7 @@ println("\nCreating a small binary test mask...")
 ref_vol_path = joinpath(dataset_dir, measurements[1, :file])
 img = niread(ref_vol_path)
 
-# Mutate the raw array to be a binary mask (setting a 5x5x5 region in the center to 1, others to 0)
+# Mutate the raw array to be a binary mask
 img.raw .= 0
 x_mid, y_mid, z_mid = size(img) .÷ 2
 img.raw[x_mid-5:x_mid+5, y_mid-5:y_mid+5, z_mid-5:z_mid+5] .= 1.0
