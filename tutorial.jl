@@ -298,7 +298,7 @@ function fit_to_voxel(voxel_matrix; model, specification)
     # collect parameter names and estimates into a NamedTuple
     # apply_voxelwise concatenates these into columns of the results DataFrame
     out = param_labels(fitted) .=> solution(fitted)
-    push!(out, :converged => converged(fitted))
+    push!(out, :converged => convergence(fitted))
     return NamedTuple(out)
 end
 
