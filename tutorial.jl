@@ -12,41 +12,16 @@
 #
 #  In this tutorial we work with the T1w structural images.
 #  Each subject contributes 2 T1w scans acquired weeks apart, giving us a
-#  small longitudinal dataset. The scientific question is:
-#
-#       "Is there a systematic difference in grey-matter intensity
-#        between session 1 and session 2 across subjects?"
-#
+#  small longitudinal dataset. 
+
 #  We model this with a one-factor SEM (latent intercept) fitted
 #  independently at every voxel inside a brain mask.
 #
 ############################################################################################
-#
-#  Download the dataset (2 subjects is enough to follow this tutorial):
-#
-#    pip install awscli
-#
-#    aws s3 sync \
-#    --no-sign-request \
-#    s3://openneuro.org/ds000224 \
-#    ./data/ds000224 \
-#    --exclude "*" \
-#    --include "sub-MSC01/ses-struct*/anat/*T1w*" \
-#    --include "sub-MSC01/ses-struct*/anat/*T2w*" \
-#    --include "sub-MSC02/ses-struct*/anat/*T1w*" \
-#    --include "sub-MSC02/ses-struct*/anat/*T2w*" \
-#    --include "participants.tsv" \
-#    --include "dataset_description.json"
-
-#  After the download your folder should look like:
-#
-#    data/ds000224/
-#      sub-MSC01/
-#        ses-struct01/anat/sub-MSC01_ses-struct01_T1w.nii.gz
-#        ses-struct02/anat/sub-MSC01_ses-struct02_T1w.nii.gz
-#      sub-MSC02/
-#        ses-struct01/anat/sub-MSC02_ses-struct01_T1w.nii.gz
-#        ses-struct02/anat/sub-MSC02_ses-struct02_T1w.nii.gz
+#  Dataset Download:
+#  The dataset is distributed as a platform-independent Julia Artifact.
+#  The first time you run this tutorial, Julia will automatically download and cache
+#  the 5-subject subset of the Midnight Scan Club dataset
 #
 ############################################################################################
 
@@ -61,6 +36,7 @@ using JLD2
 using Statistics
 using StenoGraphs
 using StructuralEquationModels
+using LazyArtifacts
 
 # Fallback names method for NamedTuple to support save_log in the tutorial environment
 Base.names(nt::NamedTuple) = collect(keys(nt))
@@ -68,8 +44,8 @@ Base.names(nt::NamedTuple) = collect(keys(nt))
 ###########################################################################################
 #  Setup Paths
 
-dataset_dir = "data/ds000224"
-mask_path   = "data/brain_mask.nii.gz" # we will create this mask further down
+dataset_dir = artifact"msc_dataset"
+mask_path   = joinpath(artifact"brain_mask", "brain_mask.nii.gz")
 mkpath("data/measurements")
 mkpath("data/results")
 mkpath("logs")
@@ -113,28 +89,7 @@ println(first(measurements, 4))
 # Save to CSV.
 save_measurements(measurements, "data/measurements/measurements.csv")
 
-############################################################################################
-# STEP 2a — Create a brain mask
-############################################################################################
-
-# A brain mask is a binary NIfTI volume (1 = inside brain, 0 = outside) in the
-# same space and dimensions as the T1w images. It tells generate_coordinates
-# which voxels to include in the analysis.
-
-# For this tutorial we create a small
-# 11×11×11 voxel mask in the centre of the volume so the pipeline runs quickly on any machine.
-
-# Load the first T1w image to get the volume dimensions and NIfTI header.
-ref_path = joinpath(dataset_dir, measurements[1, :file])
-img = niread(ref_path)
-
-# Set the entire volume to 0, then turn on an 11×11×11 block in the centre.
-img.raw .= 0
-x_mid, y_mid, z_mid = size(img) .÷ 2
-img.raw[x_mid-5:x_mid+5, y_mid-5:y_mid+5, z_mid-5:z_mid+5] .= 1.0
-
-niwrite(mask_path, img)
-println("mask written to: ", mask_path, "  (", sum(img.raw .== 1), " voxels)")
+# 2a. Voxel selection is handled via the distributed artifact brain mask.
 
 ############################################################################################
 # STEP 2b — Generate voxel coordinates from the mask
@@ -159,16 +114,16 @@ coordinates = generate_coordinates(mask = mask_path)
 # Axis 2 is addressed by measurements.session_number  (1, 2, …).
 # Axis 3 is addressed by measurements.subject_number  (1, 2, …).
 #
-# For this tutorial the array shape will be (n_voxels, 2, 2)
-# where 2 subjects and 2 sessions each contribute one T1w scan.
+# For this tutorial the array shape will be (n_voxels, 2, 5)
+# where 5 subjects and 2 sessions each contribute one T1w scan.
 
 vw_data = voxel_wise_data(dataset_dir, measurements, coordinates)
 
 println("data array size: ", size(vw_data))
-# → (n_voxels, 2, 2)
+# → (n_voxels, 2, 5)
 
 # Indexing examples:
-#   vw_data[coordinates.voxel_idx[1], :, :]  — one voxel, all sessions × subjects (2×2 matrix)
+#   vw_data[coordinates.voxel_idx[1], :, :]  — one voxel, all sessions × subjects (2×5 matrix)
 #   vw_data[:, 1, 1]                         — all voxels, session 1, subject 1
 
 # Save to JLD2
@@ -324,5 +279,6 @@ println(first(results, 5))
 
 CSV.write("data/results/voxel_wise_results.csv", results)
 println("results saved to data/results/voxel_wise_results.csv")
+
 
 

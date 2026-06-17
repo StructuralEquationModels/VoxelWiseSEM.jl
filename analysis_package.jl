@@ -8,10 +8,11 @@ using JLD2
 using Statistics
 using StenoGraphs
 using StructuralEquationModels
+using LazyArtifacts
 
 # 1. Setup paths
-dataset_dir = "data/ds000224"
-mask_path = "test_mask.nii.gz"
+dataset_dir = artifact"msc_dataset"
+mask_path = joinpath(artifact"brain_mask", "brain_mask.nii.gz")
 
 println("Step 1: Running generate_measurements...")
 measurements = generate_measurements(dir = dataset_dir, modality = "anat")
@@ -22,18 +23,7 @@ mkpath("data/measurements")
 filter!(r -> endswith(r.file, "_T1w.nii.gz"), measurements)
 save_measurements(measurements, "data/measurements/measurements.csv")
 
-# 2. Create a small dummy mask to select a small region in the center of the brain volume.
-println("\nCreating a small binary test mask...")
-ref_vol_path = joinpath(dataset_dir, measurements[1, :file])
-img = niread(ref_vol_path)
-
-# Mutate the raw array to be a binary mask
-img.raw .= 0
-x_mid, y_mid, z_mid = size(img) .÷ 2
-img.raw[x_mid-5:x_mid+5, y_mid-5:y_mid+5, z_mid-5:z_mid+5] .= 1.0
-
-niwrite(mask_path, img)
-println("Test mask written to: ", mask_path)
+# 2. Voxel selection is handled via the distributed artifact brain mask.
 
 # 3. Generate coordinates
 println("\nStep 2a: Generating coordinates from mask...")
@@ -121,7 +111,5 @@ results = apply_voxelwise(
 println("\nFirst few rows of fitting results:")
 println(first(results, 5))
 
-# Clean up test mask
-rm(mask_path, force=true)
-
 println("\n=== Validation Successful! VoxelWiseSEM runs perfectly ===")
+
