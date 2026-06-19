@@ -20,7 +20,7 @@ We model this with a SEM (latent intercept) fitted independently at every voxel 
 You have two options for setting up the Midnight Scan Club (MSC) data for this tutorial:
 
 ### Option A: Using Julia Artifacts (Recommended & Automatic)
-The dataset is distributed as a platform-independent Julia Artifact. The first time you run the script, Julia will automatically download and cache the 5-subject subset (with 2 sessions) of the Midnight Scan Club dataset. 
+The dataset is distributed as a platform-independent Julia Artifact. The first time you run the script, Julia will automatically download and cache the 10-subject (with 2 sessions each) of the Midnight Scan Club dataset. 
 
 If using this option, you do not need to install the AWS CLI or download any files manually.
 
@@ -38,7 +38,7 @@ Verify AWS CLI:
 aws --version
 ```
 
-Once AWS CLI is installed, run this from your terminal to download the first 5 subjects:
+Once AWS CLI is installed, run this from your terminal to download the 10 subjects:
 ```bash
 aws s3 sync \
     --no-sign-request \
@@ -50,6 +50,11 @@ aws s3 sync \
     --include "sub-MSC03/ses-struct*/anat/*T1w*" \
     --include "sub-MSC04/ses-struct*/anat/*T1w*" \
     --include "sub-MSC05/ses-struct*/anat/*T1w*" \
+    --include "sub-MSC06/ses-struct*/anat/*T1w*" \
+    --include "sub-MSC07/ses-struct*/anat/*T1w*" \
+    --include "sub-MSC08/ses-struct*/anat/*T1w*" \
+    --include "sub-MSC09/ses-struct*/anat/*T1w*" \
+    --include "sub-MSC10/ses-struct*/anat/*T1w*" \
     --include "participants.tsv" \
     --include "dataset_description.json"
 ```
@@ -67,10 +72,10 @@ using StenoGraphs, StructuralEquationModels
 using LazyArtifacts
 
 # --- Choose Data Source Option ---
-# Option A (Recommended): Use automated Julia Artifacts (5 subjects)
+# Option A (Recommended): Use automated Julia Artifacts (10 subjects)
 dataset_dir = artifact"msc_dataset"
 
-# Option B: Use manual AWS sync data (5 subjects)
+# Option B: Use manual AWS sync data (10 subjects)
 # dataset_dir = "data/ds000224"
 ```
 
@@ -141,7 +146,7 @@ println("voxels in mask: ", nrow(coordinates))
 - Axis 2 is addressed by `measurements.session_number` (1, 2, …).
 - Axis 3 is addressed by `measurements.subject_number` (1, 2, …).
 
-For this tutorial the array shape will be (max_voxel_index, 2, 5), where  2 sessions  and 5 subjects each contribute one T1w scan.
+For this tutorial the array shape will be (max_voxel_index, 2, 10), where 2 sessions and 10 subjects each contribute one T1w scan.
 
 ```julia
 vw_data = voxel_wise_data(dataset_dir, measurements, coordinates)
