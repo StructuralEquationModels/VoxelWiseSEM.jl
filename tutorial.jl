@@ -21,7 +21,7 @@
 #  Dataset Download:
 #  The dataset is distributed as a platform-independent Julia Artifact.
 #  The first time you run this tutorial, Julia will automatically download and cache
-#  the 5-subject subset of the Midnight Scan Club dataset
+#  the 10 subjects of the Midnight Scan Club dataset
 #
 ############################################################################################
 
@@ -114,16 +114,16 @@ coordinates = generate_coordinates(mask = mask_path)
 # Axis 2 is addressed by measurements.session_number  (1, 2, …).
 # Axis 3 is addressed by measurements.subject_number  (1, 2, …).
 #
-# For this tutorial the array shape will be (n_voxels, 2, 5)
-# where 5 subjects and 2 sessions each contribute one T1w scan.
+# For this tutorial the array shape will be (n_voxels, 2, 10)
+# where 10 subjects and 2 sessions each contribute one T1w scan.
 
 vw_data = voxel_wise_data(dataset_dir, measurements, coordinates)
 
 println("data array size: ", size(vw_data))
-# → (n_voxels, 2, 5)
+# → (n_voxels, 2, 10)
 
 # Indexing examples:
-#   vw_data[coordinates.voxel_idx[1], :, :]  — one voxel, all sessions × subjects (2×5 matrix)
+#   vw_data[coordinates.voxel_idx[1], :, :]  — one voxel, all sessions × subjects (2×10 matrix)
 #   vw_data[:, 1, 1]                         — all voxels, session 1, subject 1
 
 # Save to JLD2
@@ -279,6 +279,3 @@ println(first(results, 5))
 
 CSV.write("data/results/voxel_wise_results.csv", results)
 println("results saved to data/results/voxel_wise_results.csv")
-
-
-
