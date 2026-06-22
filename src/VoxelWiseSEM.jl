@@ -9,6 +9,7 @@ module VoxelWiseSEM
         include("helper.jl")
     export 
         generate_measurements,
+        save_measurements,  #updated
         generate_coordinates,
         voxel_wise_data,
         save_voxel_wise_data,
