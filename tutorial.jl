@@ -198,8 +198,8 @@ save_log(log, (modality = "T1w",))
 #   - one latent variable I 
 #   - one observed variable per subject
 
-n_subjects    = maximum(measurements.subject_number)
-observed_vars = Symbol.(:t, 1:n_subjects) 
+n_sessions    = maximum(measurements.session_number)
+observed_vars = Symbol.(:t, 1:n_sessions) 
 latent_vars   = [:I]
 
 # ── 4a. Define the SEM graph with StenoGraphs ────────────────────────────────
@@ -227,7 +227,7 @@ partable = ParameterTable(
 # The SEM expects rows = observations (sessions) and columns = variables (subjects),
 # which matches this layout directly.
 
-base_data = vw_data[coordinates.voxel_idx[1], :, :]   # shape: (n_sessions × n_subjects)
+base_data = vw_data[coordinates.voxel_idx[4], :, :]'   # shape: (n_subjects x n_sessions)
 
 model = Sem(
     specification = partable,
@@ -235,25 +235,24 @@ model = Sem(
     loss          = SemFIML,
     meanstructure = true,
     data          = base_data,
-    implied       = RAMSymbolic
+    implied       = RAMSymbolic,
 )
 
 # ── 4c. Define the per-voxel fitting function ─────────────────────────────────
 # apply_voxelwise calls this function once per voxel, passing a view of the
 # data array of shape (n_sessions × n_subjects).
 
-function fit_to_voxel(voxel_matrix; model, specification)
+function fit_to_voxel(voxel_matrix; model)
     # The matrix is in the expected shape (n_sessions × n_subjects)
     model_vox = replace_observed(
-        model; 
-        data = voxel_matrix, specification
+        model, voxel_matrix'/100
     )
     fitted = fit(model_vox; start_val = start_simple)
 
     # collect parameter names and estimates into a NamedTuple
     # apply_voxelwise concatenates these into columns of the results DataFrame
     out = param_labels(fitted) .=> solution(fitted)
-    push!(out, :converged => convergence(fitted))
+    push!(out, :converged => converged(fitted))
     return NamedTuple(out)
 end
 
@@ -268,7 +267,6 @@ results = apply_voxelwise(
     coordinates,
     vw_data;
     model         = model,
-    specification = partable
 )
 
 # The results DataFrame has all coordinate columns (voxel, x, y, z) plus one
