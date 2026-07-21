@@ -1,17 +1,39 @@
-function generate_measurements(;dir)
+"""
+    generate_measurements(;dir, modality = "anat") -> DataFrame
+ 
+Scans a BIDS dataset and returns a DataFrame with one row per NIfTI file found.
+Only '.nii' and '.nii.gz' files are included.
+ 
+# Arguments
+- 'dir': path to the BIDS root directory.
+- 'modality': the BIDS datatype subfolder to look in ('"anat"', '"func"', '"dwi"', …).
+ 
+# Returns
+A DataFrame with columns:
+- 'subject': BIDS subject label, e.g. '"sub-MSC01"'
+- 'subject_number': integer index
+- 'session': BIDS session label, e.g. '"ses-struct01"'
+- 'session_number': integer parsed from the trailing digits of the session label
+- 'modality': the datatype folder name, e.g. '"anat"'
+- 'file': relative path of the NIfTI file from the BIDS root directory
+"""
+function generate_measurements(;dir, modality = "anat")
     # find subjects
     subjects = readdir(dir)
-    subjects = filter(x -> startswith(x, "sub"), subjects)
+    subjects = sort(filter(x -> startswith(x, "sub-"), subjects))
+
     # find sessions
-    sessions = [find_sessions(dir, sub) for sub in subjects]
+    sessions = [find_sessions(dir, sub, modality) for sub in subjects]
+
     # find files
-    files = [[readdir(joinpath(dir, sub, ses, "anat")) for ses in sessions[i]] for (i, sub) in enumerate(subjects)]
-    # put everything together in a DataFrame
+    files = [[filter(x -> endswith(x, ".nii") || endswith(x, ".nii.gz"), readdir(joinpath(dir, sub, ses, modality))) 
+    for ses in sessions[i]] for (i, sub) in enumerate(subjects)]
+
     rows = []
     for (i, sub) in enumerate(subjects)
         for (j, ses) in enumerate(sessions[i])
             for (k, file) in enumerate(files[i][j])
-                session_number = parse(Int, ses[5:end])
+                session_number = _parse_session_number(ses)
                 push!(
                     rows, 
                     (
@@ -19,27 +41,78 @@ function generate_measurements(;dir)
                         subject_number = i, 
                         session = ses, 
                         session_number = session_number,
-                        file = file
+                        modality= modality,
+                        file = joinpath(sub, ses, modality, file)
                     )
                 )
             end
         end
     end
     rows = DataFrame(rows)
-    println("number of subjects:", maximum(rows.subject_number))
-    println("number of sessions:", maximum(rows.session_number))
+    println("number of subjects:", unique(rows.subject_number))
+    println("number of sessions:", unique(rows.session_number))
     return rows
 end
 
-# helper
-function find_sessions(dir, sub)
-    sessions = readdir(joinpath(dir, sub))
-    sessions = filter(x -> startswith(x, "ses"), sessions)
-    sessions = filter(x -> contains_anat(dir, sub, x), sessions)
-    return sessions
+"""
+    save_measurements(measurements, path)
+ 
+Writes the measurements DataFrame to a CSV file at `path`.
+Load it back with `CSV.read(path, DataFrame)`.
+ 
+# Example
+```julia
+save_measurements(measurements, "measurements.csv")
+measurements = CSV.read("measurements.csv", DataFrame)
+```
+"""
+function save_measurements(measurements::DataFrame, path::AbstractString)
+    CSV.write(path, measurements)
+    println("measurements saved to \"", path, "\"")
 end
 
-function contains_anat(dir, sub, ses)
+# helper
+"""
+    find_sessions(dir, sub, modality) -> Vector{String}
+ 
+Returns a sorted list of session folder names for `sub` that contain the
+given `modality` subfolder.
+"""
+function find_sessions(dir, sub, modality)
+    sessions = readdir(joinpath(dir, sub))
+    sessions = filter(x -> startswith(x, "ses-"), sessions)
+    sessions = filter(x -> contains_modality(dir, sub, x, modality), sessions)
+    return sort(sessions)
+end
+
+#helper for modality
+"""
+    contains_modality(dir, sub, ses, modality) -> Bool
+ 
+Returns `true` if the session folder contains a subfolder named `modality`
+"""
+function contains_modality(dir, sub, ses, modality)
     datatypes = readdir(joinpath(dir, sub, ses))
-    return any(datatypes .== "anat")
+    return any(datatypes .== modality)
+end
+
+"""
+    _parse_session_number(ses) -> Int
+ 
+Extracts the trailing integer from a BIDS session label.
+Returns `0` if no digits are found.
+ 
+# Examples
+```julia
+_parse_session_number("ses-01")       # → 1
+_parse_session_number("ses-struct02") # → 2
+```
+"""
+function _parse_session_number(ses::AbstractString)
+    m = match(r"\d+$", ses)  
+    if m === nothing
+        return 0
+    else
+        return parse(Int, m.match)
+    end
 end
