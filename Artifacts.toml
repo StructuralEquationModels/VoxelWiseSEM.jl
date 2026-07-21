@@ -3,7 +3,7 @@ git-tree-sha1 = "735db88b864c0c9666df58fa9cdc42cf6ec397ba"
 lazy = true
 
     [[brain_mask.download]]
-    sha256 = "6d922e5a3b17fc1f408f25e32f3540d0c56315e4e245339aa9ae3f29f9f48683"
+    sha256 = "2fb498fb5ef2bd8ea46836be7fba43acb0f81bce3d3a798ff4c99bd8ae3a79a3"
     url = "https://github.com/StructuralEquationModels/VoxelWiseSEM.jl/releases/download/v0.1.0/brain_mask.tar.gz"
 
 [msc_dataset]
