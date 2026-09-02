@@ -119,12 +119,19 @@ coordinates = generate_coordinates(mask = mask_path)
 
 vw_data = voxel_wise_data(dataset_dir, measurements, coordinates)
 
+# Z-score normalize each scan across voxels
+for sub in 1:size(vw_data, 3)
+    for s in 1:size(vw_data, 2)
+        scan_data = vw_data[:, s, sub]
+        μ = mean(skipmissing(scan_data))
+        σ = std(skipmissing(scan_data))
+        vw_data[:, s, sub] = (scan_data .- μ) ./ σ
+    end
+end
+println("Subject-wise z-score normalization done.")
+
 println("data array size: ", size(vw_data))
 # → (n_voxels, 2, 10)
-
-# Indexing examples:
-#   vw_data[coordinates.voxel_idx[1], :, :]  — one voxel, all sessions × subjects (2×10 matrix)
-#   vw_data[:, 1, 1]                         — all voxels, session 1, subject 1
 
 # Save to JLD2
 save_voxel_wise_data(vw_data, "data/vw_data.jld2")
@@ -242,17 +249,19 @@ model = Sem(
 # apply_voxelwise calls this function once per voxel, passing a view of the
 # data array of shape (n_sessions × n_subjects).
 
-function fit_to_voxel(voxel_matrix; model)
+function fit_to_voxel(voxel_matrix; model, specification)
     # The matrix is in the expected shape (n_sessions × n_subjects)
     model_vox = replace_observed(
-        model, voxel_matrix'/100
+        model;
+        data          = voxel_matrix',
+        specification = specification
     )
     fitted = fit(model_vox; start_val = start_simple)
 
     # collect parameter names and estimates into a NamedTuple
     # apply_voxelwise concatenates these into columns of the results DataFrame
     out = param_labels(fitted) .=> solution(fitted)
-    push!(out, :converged => converged(fitted))
+    push!(out, :converged => convergence(fitted))
     return NamedTuple(out)
 end
 
@@ -267,6 +276,7 @@ results = apply_voxelwise(
     coordinates,
     vw_data;
     model         = model,
+    specification = partable
 )
 
 # The results DataFrame has all coordinate columns (voxel, x, y, z) plus one
